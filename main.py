@@ -26,9 +26,11 @@ class SelectedZone:
 targetPath = "targets/"
 resultsPath = "results/"
 
-img = None
-baseImage = None
-selectedZone = None
+img = None # Image shown in the main window
+baseImage = None # Copy of that image, never modified, and copied to 'img' each time a draw call is made
+imgGray = None # Grayscale values of the baseImage, used for target tracking calculations
+
+selectedZone = None # Data associated with the zone the user selected in the image
 
 drag = False
 p1, p2 = [], []
@@ -51,7 +53,7 @@ def getTargetPicturesPaths():
 
 
 def calculateRectangleData():
-    global p1, p2
+    global imgGray, selectedZone, p1, p2
 
     if p1[0] > p2[0]:
         p1[0], p2[0] = p2[0], p1[0]
@@ -66,14 +68,15 @@ def calculateRectangleData():
     print(f'Rectangle size: {sizeX} * {sizeY} ({totalPx} pixels)')
 
     cv2.destroyWindow("Selected pixels")
-    selectedPixels = baseImage[p1[1]:p2[1], p1[0]:p2[0]]
+    selectedPixels = imgGray[p1[1]:p2[1], p1[0]:p2[0]]
     cv2.imshow("Selected pixels", selectedPixels)
 
     selectedZone = SelectedZone(p1, p2, sizeX, sizeY, totalPx, selectedPixels)
+    print(selectedZone)
 
 
 def mouseEvent(event, x, y, flags, params):
-    global drag, p1, p2
+    global img, baseImage, drag, p1, p2
     redraw = False
 
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -98,12 +101,13 @@ def mouseEvent(event, x, y, flags, params):
 
 
 def openFirstFile():
-    global img, baseImage
+    global img, baseImage, imgGray
 
     files = getTargetPicturesPaths()
 
     img = cv2.imread(files[0], cv2.IMREAD_COLOR)
     baseImage = img.copy()
+    imgGray = cv2.imread(files[0], cv2.IMREAD_GRAYSCALE)
     cv2.imshow("First image", img)
 
     cv2.setMouseCallback("First image", mouseEvent)
