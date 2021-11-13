@@ -23,7 +23,7 @@ p1, p2 = [], []
 
 def getTargetPicturesPaths():
     if not os.path.exists(targetPath):
-        print("ERROR: can't find '" + targetPath + "' directory.")
+        print(f'ERROR: can\'t find {targetPath} directory.')
         return
 
     files = os.listdir(targetPath)
@@ -31,6 +31,26 @@ def getTargetPicturesPaths():
         files[i] = targetPath + files[i]
     
     return files
+
+
+def calculateRectangleData():
+    global p1, p2
+
+    if p1[0] > p2[0]:
+        p1[0], p2[0] = p2[0], p1[0]
+    if p1[1] > p2[1]:
+        p1[1], p2[1] = p2[1], p1[1]
+
+    deltaX = p2[0] - p1[0]
+    deltaY = p2[1] - p1[1]
+    totalPx = (deltaX + 1) * (deltaY + 1)
+
+    print(f'Selected pixels: from {p1} to {p2}')
+    print(f'Rectangle size: {(deltaX + 1)} * {(deltaY + 1)} ({totalPx} pixels)')
+
+    cv2.destroyWindow("Selected pixels")
+    selectedPixels = baseImage[p1[1]:p2[1], p1[0]:p2[0]]
+    cv2.imshow("Selected pixels", selectedPixels)
 
 
 def mouseEvent(event, x, y, flags, params):
@@ -46,7 +66,7 @@ def mouseEvent(event, x, y, flags, params):
         p2 = [x, y]
         drag = False
         redraw = True
-        print("Selected pixels: " + str(tuple(p1)) + " to " + str(tuple(p2)))
+        calculateRectangleData()
     
     if drag:
         p2 = [x, y]
