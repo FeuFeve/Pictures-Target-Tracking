@@ -2,6 +2,22 @@ import cv2
 import numpy as np
 import os
 
+from dataclasses import dataclass
+
+
+# ------------------------------------------------------------
+# Dataclasses
+# ------------------------------------------------------------
+
+@dataclass
+class SelectedZone:
+    p1: list
+    p2: list
+    sizeX: int
+    sizeY: int
+    totalPixels: int
+    selectedPixels: np.ndarray
+
 
 # ------------------------------------------------------------
 # Global variables
@@ -12,6 +28,7 @@ resultsPath = "results/"
 
 img = None
 baseImage = None
+selectedZone = None
 
 drag = False
 p1, p2 = [], []
@@ -41,16 +58,18 @@ def calculateRectangleData():
     if p1[1] > p2[1]:
         p1[1], p2[1] = p2[1], p1[1]
 
-    deltaX = p2[0] - p1[0]
-    deltaY = p2[1] - p1[1]
-    totalPx = (deltaX + 1) * (deltaY + 1)
+    sizeX = p2[0] - p1[0] + 1
+    sizeY = p2[1] - p1[1] + 1
+    totalPx = sizeX * sizeY
 
     print(f'Selected pixels: from {p1} to {p2}')
-    print(f'Rectangle size: {(deltaX + 1)} * {(deltaY + 1)} ({totalPx} pixels)')
+    print(f'Rectangle size: {sizeX} * {sizeY} ({totalPx} pixels)')
 
     cv2.destroyWindow("Selected pixels")
     selectedPixels = baseImage[p1[1]:p2[1], p1[0]:p2[0]]
     cv2.imshow("Selected pixels", selectedPixels)
+
+    selectedZone = SelectedZone(p1, p2, sizeX, sizeY, totalPx, selectedPixels)
 
 
 def mouseEvent(event, x, y, flags, params):
