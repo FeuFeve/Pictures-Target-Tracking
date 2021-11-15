@@ -1,4 +1,5 @@
 import cv2
+import math
 import numpy as np
 import os
 
@@ -67,7 +68,7 @@ def generateTargetPicturesPaths():
         files[i] = targetPath + files[i]
 
 
-def calculateRectangleData():
+def calculateRectangleData(showInformation = False):
     global imgGray, currentSelectedZone, p1, p2, currentSelectedZone
 
     if p1[0] > p2[0]:
@@ -79,12 +80,14 @@ def calculateRectangleData():
     sizeY = p2[1] - p1[1] + 1
     totalPx = sizeX * sizeY
 
-    print(f'Selected pixels: from {p1} to {p2}')
-    print(f'Rectangle size: {sizeX} * {sizeY} ({totalPx} pixels)')
+    selectedPixels = imgGray[p1[1]:p2[1] + 1, p1[0]:p2[0] + 1]
 
-    cv2.destroyWindow("Selected pixels")
-    selectedPixels = imgGray[p1[1]:p2[1], p1[0]:p2[0]]
-    cv2.imshow("Selected pixels", selectedPixels)
+    if showInformation:
+        print(f'Selected pixels: from {p1} to {p2}')
+        print(f'Rectangle size: {sizeX} * {sizeY} ({totalPx} pixels)')
+
+        cv2.destroyWindow("Selected pixels")
+        cv2.imshow("Selected pixels", selectedPixels)
 
     currentSelectedZone = SelectedZone(p1, p2, sizeX, sizeY, totalPx, selectedPixels)
 
@@ -103,7 +106,7 @@ def handleMouseEvents(event, x, y, flags, params):
         drag = False
         redraw = True
         if p1[0] != p2[0] and p1[1] != p2[1]:
-            calculateRectangleData()
+            calculateRectangleData(True)
     
     if drag:
         p2 = [x, y]
@@ -131,6 +134,7 @@ def openFirstFile():
 
 def generatePossibleStartingCoordinates(height, width):
     global possibleStartingCoordinates, previousSelectedZone
+    print("Generating possible coordinates...")
 
     possibleStartingCoordinates = []
 
@@ -141,6 +145,54 @@ def generatePossibleStartingCoordinates(height, width):
             for x in range(previousStartX - radius, previousStartX + radius + 1):
                 if 0 <= x <= width - previousSelectedZone.sizeX:
                     possibleStartingCoordinates.append((x, y))
+
+
+def calculateZoneAverage(zone):
+    pixelSum = 0
+    for line in zone.selectedPixels:
+        for pixelValue in line:
+            pixelSum += pixelValue
+    return pixelSum / zone.totalPixels
+
+
+def calculateZoneStandardDeviation(zone, zoneAverage):
+    deviationSum = 0
+    for line in zone.selectedPixels:
+        for pixelValue in line:
+            deviationSum += math.pow(pixelValue - zoneAverage, 2)
+    return math.sqrt((1/float(zone.totalPixels)) * deviationSum)
+
+
+def calculateScoreBetweenSelectedZones():
+    global previousSelectedZone, currentSelectedZone
+
+    previousAverage = calculateZoneAverage(previousSelectedZone)
+    previousStandardDeviation = calculateZoneStandardDeviation(previousSelectedZone, previousAverage)
+    currentAverage = calculateZoneAverage(currentSelectedZone)
+    currentStandardDeviation = calculateZoneStandardDeviation(currentSelectedZone, currentAverage)
+
+    score = 0
+    for y in range(previousSelectedZone.sizeY):
+        for x in range(previousSelectedZone.sizeX):
+            score += (previousSelectedZone.selectedPixels[y, x] - previousAverage) * (currentSelectedZone.selectedPixels[y, x] - currentAverage)
+    score /= (previousSelectedZone.totalPixels * previousStandardDeviation * currentStandardDeviation)
+
+    return score
+
+
+def calculateScoreForEachStartingCoordinates():
+    global previousSelectedZone, currentSelectedZone, possibleStartingCoordinates, p1, p2
+    print("Calculating Pearson correlation coefficients...")
+
+    scores = []
+    for coords in possibleStartingCoordinates:
+        p1 = list(coords)
+        p2[0] = p1[0] + previousSelectedZone.sizeX - 1
+        p2[1] = p1[1] + previousSelectedZone.sizeY - 1
+        calculateRectangleData()
+        scores.append(calculateScoreBetweenSelectedZones())
+    
+    return scores
 
 
 def trackTarget():
@@ -160,12 +212,9 @@ def trackTarget():
         width = currentImageGray.shape[1]
 
         generatePossibleStartingCoordinates(height, width)
-        print(f'From p1 = {p1}')
-        print(f'With image size = [{width} * {height}]')
-        print(f'And selection size = [{previousSelectedZone.sizeX} * {previousSelectedZone.sizeY}]')
-        print("Possible starting coordinates:")
-        for coords in possibleStartingCoordinates:
-            print(coords)
+        scores = calculateScoreForEachStartingCoordinates()
+        print("Pearson scores:")
+        print(scores)
         break
 
 
