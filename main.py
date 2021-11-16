@@ -262,6 +262,17 @@ def calculateScoreForEachStartingCoordinates():
     return scores
 
 
+def reset():
+    global p1, p2, currentSelectedZone, previousSelectedZone
+    
+    p1, p2 = [], []
+    currentSelectedZone = None
+    previousSelectedZone = None
+
+    cv2.destroyAllWindows()
+    openFirstFile()
+
+
 def trackTarget():
     global currentSelectedZone, previousSelectedZone, img, imgGray, files, possibleStartingCoordinates
     printBegin("Rendering target tracking...")
@@ -291,7 +302,8 @@ def trackTarget():
         cv2.imwrite(f'{resultsPath}{i}.tif', img)
 
         printText(f'Progress: {i}/{len(files) - 1}')
-
+    
+    reset()
     printEnd()
 
 
