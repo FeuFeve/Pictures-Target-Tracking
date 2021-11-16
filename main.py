@@ -2,6 +2,7 @@ import cv2
 import math
 import numpy as np
 import os
+import time
 
 from dataclasses import dataclass
 
@@ -55,8 +56,10 @@ possibleStartingCoordinates = [] # Each possible p1 for the currentSelectedZone
 # PRINTING RELATED
 
 taskIndex = -1
-taskIndexStack = []
 printOffset = ""
+
+taskIndexStack = []
+taskTimerStack = []
 
 
 # ------------------------------------------------------------
@@ -64,11 +67,12 @@ printOffset = ""
 # ------------------------------------------------------------
 
 def printBegin(text):
-    global taskIndex, taskIndexStack, printOffset
+    global taskIndex, printOffset, taskIndexStack, taskTimerStack
 
     taskIndex += 1
     printOffset = "  " * len(taskIndexStack)
     taskIndexStack.append(taskIndex)
+    taskTimerStack.append(time.time())
     print(f'{printOffset}[{taskIndex}] {text}')
 
 
@@ -77,7 +81,9 @@ def printEnd():
 
     index = taskIndexStack.pop()
     printOffset = "  " * len(taskIndexStack)
-    print(f'{printOffset}[{index}] Done')
+    startTime = taskTimerStack.pop()
+    endTime = time.time()
+    print(f'{printOffset}[{index}] Done in {"{:.3f}".format(endTime - startTime)}s')
 
 
 def printText(text):
