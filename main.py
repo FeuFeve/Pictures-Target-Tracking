@@ -2,6 +2,7 @@ import cv2
 import math
 import numpy as np
 import os
+import shutil
 import time
 
 from dataclasses import dataclass
@@ -32,7 +33,10 @@ resultsPath = "results/"
 files = [] # Paths of each target files
 
 
-# FIRST IMAGE RELATED
+# OPENCV WINDOWS RELATED
+
+mainWindowName = "Images Target Tracking"
+secondaryWindowName = "Selected pixels"
 
 img = None # Image shown in the main window
 baseImage = None # Copy of that image, never modified, and copied to 'img' each time a draw call is made
@@ -97,48 +101,32 @@ def printError(text):
 
 
 # ------------------------------------------------------------
-# Functions
+# General application functions
 # ------------------------------------------------------------
+
+def createFoldersIfNeeded():
+    if not os.path.exists(targetPath):
+        os.makedirs(targetPath)
+    
+    if not os.path.exists(resultsPath):
+        os.makedirs(resultsPath)
+
 
 def quitApplication():
     cv2.destroyAllWindows()
     quit()
 
 
-def generateTargetPicturesPaths():
-    global files
-
-    if not os.path.exists(targetPath):
-        printError(f'Can\'t find {targetPath} directory.')
-        quitApplication()
-
-    files = os.listdir(targetPath)
-    for i in range(len(files)):
-        files[i] = targetPath + files[i]
-
-
-def calculateRectangleData(showInformation = False):
-    global imgGray, currentSelectedZone, p1, p2, currentSelectedZone
-
-    if p1[0] > p2[0]:
-        p1[0], p2[0] = p2[0], p1[0]
-    if p1[1] > p2[1]:
-        p1[1], p2[1] = p2[1], p1[1]
-
-    sizeX = p2[0] - p1[0] + 1
-    sizeY = p2[1] - p1[1] + 1
-    totalPx = sizeX * sizeY
-
-    selectedPixels = imgGray[p1[1]:p2[1] + 1, p1[0]:p2[0] + 1]
-
-    if showInformation:
-        printText(f'Selected pixels: from {p1} to {p2}')
-        printText(f'Rectangle size: {sizeX} * {sizeY} ({totalPx} pixels)')
-
-        cv2.destroyWindow("Selected pixels")
-        cv2.imshow("Selected pixels", selectedPixels)
-
-    currentSelectedZone = SelectedZone(p1, p2, sizeX, sizeY, totalPx, selectedPixels)
+def handleKeyboardEvents():
+    while cv2.getWindowProperty(mainWindowName, 0) >= 0:
+        key = cv2.waitKey(0)
+        # See https://www.asciitable.com/ for ASCII codes
+        if key == 27: # ESCAPE
+            break
+        elif key == ord('r'):
+            trackTarget()
+            
+    quitApplication()
 
 
 def handleMouseEvents(event, x, y, flags, params):
@@ -165,7 +153,7 @@ def handleMouseEvents(event, x, y, flags, params):
         img = baseImage.copy()
         if p1[0] != p2[0] and p1[1] != p2[1]:
             img = cv2.rectangle(img, tuple(p1), tuple(p2), (0, 0, 255), 1)
-        cv2.imshow("First image", img)
+        cv2.imshow(mainWindowName, img)
 
 
 def openFirstFile():
@@ -176,26 +164,36 @@ def openFirstFile():
     img = cv2.imread(files[0], cv2.IMREAD_COLOR)
     baseImage = img.copy()
     imgGray = cv2.imread(files[0], cv2.IMREAD_GRAYSCALE)
-    cv2.imshow("First image", img)
+    cv2.imshow(mainWindowName, img)
 
-    cv2.setMouseCallback("First image", handleMouseEvents)
+    cv2.setMouseCallback(mainWindowName, handleMouseEvents)
 
 
-def generatePossibleStartingCoordinates(height, width):
-    global possibleStartingCoordinates, previousSelectedZone
-    printBegin("Generating possible coordinates...")
+def reset():
+    global p1, p2, currentSelectedZone, previousSelectedZone
+    
+    p1, p2 = [], []
+    currentSelectedZone = None
+    previousSelectedZone = None
 
-    possibleStartingCoordinates = []
+    cv2.destroyAllWindows()
+    openFirstFile()
 
-    previousStartX = previousSelectedZone.p1[0]
-    previousStartY = previousSelectedZone.p1[1]
-    for y in range(previousStartY - radius, previousStartY + radius + 1):
-        if 0 <= y <= height - previousSelectedZone.sizeY:
-            for x in range(previousStartX - radius, previousStartX + radius + 1):
-                if 0 <= x <= width - previousSelectedZone.sizeX:
-                    possibleStartingCoordinates.append((x, y))
-    printEnd()
+def generateTargetPicturesPaths():
+    global files
 
+    if not os.path.exists(targetPath):
+        printError(f'Can\'t find {targetPath} directory.')
+        quitApplication()
+
+    files = os.listdir(targetPath)
+    for i in range(len(files)):
+        files[i] = targetPath + files[i]
+
+
+# ------------------------------------------------------------
+# Pearson correlation coefficients calculation functions
+# ------------------------------------------------------------
 
 def calculateZoneAverage(zone):
     pixelSum = 0
@@ -238,17 +236,6 @@ def calculateScoreBetweenSelectedZones():
     return score
 
 
-def calculateRectangleDataWithP1(coords):
-    global previousSelectedZone, p1, p2
-
-    p1 = list(coords)
-    p2 = list(coords)
-    p2[0] += previousSelectedZone.sizeX - 1
-    p2[1] += previousSelectedZone.sizeY - 1
-    
-    calculateRectangleData()
-
-
 def calculateScoreForEachStartingCoordinates():
     global previousSelectedZone, currentSelectedZone, possibleStartingCoordinates, p1, p2
     printBegin("Calculating Pearson correlation coefficients...")
@@ -262,15 +249,59 @@ def calculateScoreForEachStartingCoordinates():
     return scores
 
 
-def reset():
-    global p1, p2, currentSelectedZone, previousSelectedZone
-    
-    p1, p2 = [], []
-    currentSelectedZone = None
-    previousSelectedZone = None
+# ------------------------------------------------------------
+# Other functions
+# ------------------------------------------------------------
 
-    cv2.destroyAllWindows()
-    openFirstFile()
+def calculateRectangleData(showInformation = False):
+    global imgGray, currentSelectedZone, p1, p2, currentSelectedZone
+
+    if p1[0] > p2[0]:
+        p1[0], p2[0] = p2[0], p1[0]
+    if p1[1] > p2[1]:
+        p1[1], p2[1] = p2[1], p1[1]
+
+    sizeX = p2[0] - p1[0] + 1
+    sizeY = p2[1] - p1[1] + 1
+    totalPx = sizeX * sizeY
+
+    selectedPixels = imgGray[p1[1]:p2[1] + 1, p1[0]:p2[0] + 1]
+
+    if showInformation:
+        printText(f'Selected pixels: from {p1} to {p2}')
+        printText(f'Rectangle size: {sizeX} * {sizeY} ({totalPx} pixels)')
+
+        cv2.destroyWindow(secondaryWindowName)
+        cv2.imshow(secondaryWindowName, selectedPixels)
+
+    currentSelectedZone = SelectedZone(p1, p2, sizeX, sizeY, totalPx, selectedPixels)
+
+
+def calculateRectangleDataWithP1(coords):
+    global previousSelectedZone, p1, p2
+
+    p1 = list(coords)
+    p2 = list(coords)
+    p2[0] += previousSelectedZone.sizeX - 1
+    p2[1] += previousSelectedZone.sizeY - 1
+    
+    calculateRectangleData()
+
+
+def generatePossibleStartingCoordinates(height, width):
+    global possibleStartingCoordinates, previousSelectedZone
+    printBegin("Generating possible coordinates...")
+
+    possibleStartingCoordinates = []
+
+    previousStartX = previousSelectedZone.p1[0]
+    previousStartY = previousSelectedZone.p1[1]
+    for y in range(previousStartY - radius, previousStartY + radius + 1):
+        if 0 <= y <= height - previousSelectedZone.sizeY:
+            for x in range(previousStartX - radius, previousStartX + radius + 1):
+                if 0 <= x <= width - previousSelectedZone.sizeX:
+                    possibleStartingCoordinates.append((x, y))
+    printEnd()
 
 
 def trackTarget():
@@ -280,6 +311,10 @@ def trackTarget():
     if currentSelectedZone == None:
         printError("No zone selected. Please select a zone you want to track in the next images first.")
         return
+
+    # Reset results folder
+    shutil.rmtree(resultsPath)
+    os.makedirs(resultsPath)
 
     # Write current image to results folder
     cv2.imwrite(f'{resultsPath}0.tif', img)
@@ -307,27 +342,15 @@ def trackTarget():
     printEnd()
 
 
-def handleKeyboardEvents():
-    while cv2.getWindowProperty("First image", 0) >= 0:
-        key = cv2.waitKey(0)
-        # See https://www.asciitable.com/ for ASCII codes
-        if key == 27: # ESCAPE
-            break
-        elif key == ord('r'):
-            trackTarget()
-            
-    quitApplication()
-
-
 # ------------------------------------------------------------
 # Main
 # ------------------------------------------------------------
 
 def main():
-    print("\n\n\n## BEGIN ##")
+    print("\n\n\n")
+    createFoldersIfNeeded()
     openFirstFile()
     handleKeyboardEvents()
-    print("## END ##")
 
 
 if __name__ == "__main__":
