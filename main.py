@@ -42,7 +42,7 @@ p1, p2 = [], []
 
 # TARGET TRACKING RELATED
 
-radius = 10
+radius = 7
 
 imgGray = None # Grayscale values of the current image, used for target tracking calculations
 
@@ -78,6 +78,12 @@ def printEnd():
     index = taskIndexStack.pop()
     printOffset = "  " * len(taskIndexStack)
     print(f'{printOffset}[{index}] Done')
+
+
+def printText(text):
+    global printOffset
+
+    print(f'{printOffset}{text}')
 
 
 def printError(text):
@@ -120,8 +126,8 @@ def calculateRectangleData(showInformation = False):
     selectedPixels = imgGray[p1[1]:p2[1] + 1, p1[0]:p2[0] + 1]
 
     if showInformation:
-        print(f'Selected pixels: from {p1} to {p2}')
-        print(f'Rectangle size: {sizeX} * {sizeY} ({totalPx} pixels)')
+        printText(f'Selected pixels: from {p1} to {p2}')
+        printText(f'Rectangle size: {sizeX} * {sizeY} ({totalPx} pixels)')
 
         cv2.destroyWindow("Selected pixels")
         cv2.imshow("Selected pixels", selectedPixels)
@@ -226,18 +232,24 @@ def calculateScoreBetweenSelectedZones():
     return score
 
 
+def calculateRectangleDataWithP1(coords):
+    global previousSelectedZone, p1, p2
+
+    p1 = list(coords)
+    p2 = list(coords)
+    p2[0] += previousSelectedZone.sizeX - 1
+    p2[1] += previousSelectedZone.sizeY - 1
+    
+    calculateRectangleData()
+
+
 def calculateScoreForEachStartingCoordinates():
     global previousSelectedZone, currentSelectedZone, possibleStartingCoordinates, p1, p2
     printBegin("Calculating Pearson correlation coefficients...")
 
     scores = []
     for coords in possibleStartingCoordinates:
-        p1 = list(coords)
-        p2 = list(coords)
-        p2[0] += previousSelectedZone.sizeX - 1
-        p2[1] += previousSelectedZone.sizeY - 1
-        
-        calculateRectangleData()
+        calculateRectangleDataWithP1(coords)
         scores.append(calculateScoreBetweenSelectedZones())
 
     printEnd()
@@ -245,14 +257,17 @@ def calculateScoreForEachStartingCoordinates():
 
 
 def trackTarget():
-    global currentSelectedZone, previousSelectedZone, imgGray, files
+    global currentSelectedZone, previousSelectedZone, img, imgGray, files, possibleStartingCoordinates
     printBegin("Rendering target tracking...")
 
     if currentSelectedZone == None:
         printError("No zone selected. Please select a zone you want to track in the next images first.")
         return
+
+    # Write current image to results folder
+    cv2.imwrite(f'{resultsPath}0.tif', img)
     
-    for i in range(1, len(files) - 1):
+    for i in range(1, len(files)):
         previousSelectedZone = currentSelectedZone
         currentSelectedZone = None
 
@@ -262,11 +277,14 @@ def trackTarget():
 
         generatePossibleStartingCoordinates(height, width)
         scores = calculateScoreForEachStartingCoordinates()
+        maxScoreIndex = np.argmax(scores)
 
-        print(f'Min score: {min(scores)}, min index: {np.argmin(scores)}')
-        print(f'Max score: {max(scores)}, max index: {np.argmax(scores)}')
+        calculateRectangleDataWithP1(possibleStartingCoordinates[maxScoreIndex])
+        img = cv2.imread(files[i], cv2.IMREAD_COLOR)
+        img = cv2.rectangle(img, tuple(p1), tuple(p2), (0, 0, 255), 1)
+        cv2.imwrite(f'{resultsPath}{i}.tif', img)
 
-        break
+        printText(f'Progress: {i}/{len(files) - 1}')
 
     printEnd()
 
