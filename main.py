@@ -52,16 +52,53 @@ previousSelectedZone = None # Data associated with the selected zone in the prev
 possibleStartingCoordinates = [] # Each possible p1 for the currentSelectedZone
 
 
+# PRINTING RELATED
+
+taskIndex = -1
+taskIndexStack = []
+printOffset = ""
+
+
+# ------------------------------------------------------------
+# Printing functions
+# ------------------------------------------------------------
+
+def printBegin(text):
+    global taskIndex, taskIndexStack, printOffset
+
+    taskIndex += 1
+    printOffset = "  " * len(taskIndexStack)
+    taskIndexStack.append(taskIndex)
+    print(f'{printOffset}[{taskIndex}] {text}')
+
+
+def printEnd():
+    global taskIndexStack, printOffset
+
+    index = taskIndexStack.pop()
+    printOffset = "  " * len(taskIndexStack)
+    print(f'{printOffset}[{index}] Done')
+
+
+def printError(text):
+    print(f'ERROR: {text}')
+
+
 # ------------------------------------------------------------
 # Functions
 # ------------------------------------------------------------
+
+def quitApplication():
+    cv2.destroyAllWindows()
+    quit()
+
 
 def generateTargetPicturesPaths():
     global files
 
     if not os.path.exists(targetPath):
-        print(f'ERROR: can\'t find {targetPath} directory.')
-        return
+        printError(f'Can\'t find {targetPath} directory.')
+        quitApplication()
 
     files = os.listdir(targetPath)
     for i in range(len(files)):
@@ -134,7 +171,7 @@ def openFirstFile():
 
 def generatePossibleStartingCoordinates(height, width):
     global possibleStartingCoordinates, previousSelectedZone
-    print("Generating possible coordinates...")
+    printBegin("Generating possible coordinates...")
 
     possibleStartingCoordinates = []
 
@@ -145,7 +182,7 @@ def generatePossibleStartingCoordinates(height, width):
             for x in range(previousStartX - radius, previousStartX + radius + 1):
                 if 0 <= x <= width - previousSelectedZone.sizeX:
                     possibleStartingCoordinates.append((x, y))
-    print("\t# Done")
+    printEnd()
 
 
 def calculateZoneAverage(zone):
@@ -191,7 +228,7 @@ def calculateScoreBetweenSelectedZones():
 
 def calculateScoreForEachStartingCoordinates():
     global previousSelectedZone, currentSelectedZone, possibleStartingCoordinates, p1, p2
-    print("Calculating Pearson correlation coefficients...")
+    printBegin("Calculating Pearson correlation coefficients...")
 
     scores = []
     for coords in possibleStartingCoordinates:
@@ -203,16 +240,16 @@ def calculateScoreForEachStartingCoordinates():
         calculateRectangleData()
         scores.append(calculateScoreBetweenSelectedZones())
 
-    print("\t# Done")
+    printEnd()
     return scores
 
 
 def trackTarget():
     global currentSelectedZone, previousSelectedZone, files
-    print("Rendering target tracking...")
+    printBegin("Rendering target tracking...")
 
     if currentSelectedZone == None:
-        print("No zone selected. Please select a zone you want to track in the next images first.")
+        printError("No zone selected. Please select a zone you want to track in the next images first.")
         return
     
     for i in range(1, len(files) - 1):
@@ -229,6 +266,8 @@ def trackTarget():
         # print(scores)
         break
 
+    printEnd()
+
 
 def handleKeyboardEvents():
     while cv2.getWindowProperty("First image", 0) >= 0:
@@ -239,7 +278,7 @@ def handleKeyboardEvents():
         elif key == ord('r'):
             trackTarget()
             
-    cv2.destroyAllWindows()
+    quitApplication()
 
 
 # ------------------------------------------------------------
