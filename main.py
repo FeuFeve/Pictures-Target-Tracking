@@ -196,16 +196,11 @@ def calculateScoreForEachStartingCoordinates():
     scores = []
     for coords in possibleStartingCoordinates:
         p1 = list(coords)
-        p2[0] = p1[0] + previousSelectedZone.sizeX - 1
-        p2[1] = p1[1] + previousSelectedZone.sizeY - 1
-
-        # print("BEFORE:")
-        # print(currentSelectedZone)
+        p2 = p1
+        p2[0] += previousSelectedZone.sizeX - 1
+        p2[1] += previousSelectedZone.sizeY - 1
+        
         calculateRectangleData()
-        # print("AFTER:")
-        # print(currentSelectedZone)
-        # print("\n\n")
-
         scores.append(calculateScoreBetweenSelectedZones())
 
     print("\t# Done")
