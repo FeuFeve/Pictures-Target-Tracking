@@ -42,7 +42,7 @@ p1, p2 = [], []
 
 # TARGET TRACKING RELATED
 
-radius = 10
+radius = 1
 
 imgGray = None # Grayscale values of the current image, used for target tracking calculations
 
@@ -145,6 +145,7 @@ def generatePossibleStartingCoordinates(height, width):
             for x in range(previousStartX - radius, previousStartX + radius + 1):
                 if 0 <= x <= width - previousSelectedZone.sizeX:
                     possibleStartingCoordinates.append((x, y))
+    print("\t# Done")
 
 
 def calculateZoneAverage(zone):
@@ -160,7 +161,10 @@ def calculateZoneStandardDeviation(zone, zoneAverage):
     for line in zone.selectedPixels:
         for pixelValue in line:
             deviationSum += math.pow(pixelValue - zoneAverage, 2)
-    return math.sqrt((1/float(zone.totalPixels)) * deviationSum)
+    if deviationSum == 0:
+        return 0
+    else:
+        return math.sqrt((1/float(zone.totalPixels)) * deviationSum)
 
 
 def calculateScoreBetweenSelectedZones():
@@ -168,8 +172,13 @@ def calculateScoreBetweenSelectedZones():
 
     previousAverage = calculateZoneAverage(previousSelectedZone)
     previousStandardDeviation = calculateZoneStandardDeviation(previousSelectedZone, previousAverage)
+    if previousStandardDeviation == 0:
+        return 0
+    
     currentAverage = calculateZoneAverage(currentSelectedZone)
     currentStandardDeviation = calculateZoneStandardDeviation(currentSelectedZone, currentAverage)
+    if currentStandardDeviation == 0:
+        return 0
 
     score = 0
     for y in range(previousSelectedZone.sizeY):
@@ -189,9 +198,17 @@ def calculateScoreForEachStartingCoordinates():
         p1 = list(coords)
         p2[0] = p1[0] + previousSelectedZone.sizeX - 1
         p2[1] = p1[1] + previousSelectedZone.sizeY - 1
+
+        # print("BEFORE:")
+        # print(currentSelectedZone)
         calculateRectangleData()
+        # print("AFTER:")
+        # print(currentSelectedZone)
+        # print("\n\n")
+
         scores.append(calculateScoreBetweenSelectedZones())
-    
+
+    print("\t# Done")
     return scores
 
 
@@ -213,8 +230,8 @@ def trackTarget():
 
         generatePossibleStartingCoordinates(height, width)
         scores = calculateScoreForEachStartingCoordinates()
-        print("Pearson scores:")
-        print(scores)
+        # print("Pearson scores:")
+        # print(scores)
         break
 
 
