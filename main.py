@@ -42,7 +42,7 @@ p1, p2 = [], []
 
 # TARGET TRACKING RELATED
 
-radius = 1
+radius = 10
 
 imgGray = None # Grayscale values of the current image, used for target tracking calculations
 
@@ -233,7 +233,7 @@ def calculateScoreForEachStartingCoordinates():
     scores = []
     for coords in possibleStartingCoordinates:
         p1 = list(coords)
-        p2 = p1
+        p2 = list(coords)
         p2[0] += previousSelectedZone.sizeX - 1
         p2[1] += previousSelectedZone.sizeY - 1
         
@@ -245,7 +245,7 @@ def calculateScoreForEachStartingCoordinates():
 
 
 def trackTarget():
-    global currentSelectedZone, previousSelectedZone, files
+    global currentSelectedZone, previousSelectedZone, imgGray, files
     printBegin("Rendering target tracking...")
 
     if currentSelectedZone == None:
@@ -256,14 +256,16 @@ def trackTarget():
         previousSelectedZone = currentSelectedZone
         currentSelectedZone = None
 
-        currentImageGray = cv2.imread(files[i], cv2.IMREAD_GRAYSCALE)
-        height = currentImageGray.shape[0]
-        width = currentImageGray.shape[1]
+        imgGray = cv2.imread(files[i], cv2.IMREAD_GRAYSCALE)
+        height = imgGray.shape[0]
+        width = imgGray.shape[1]
 
         generatePossibleStartingCoordinates(height, width)
         scores = calculateScoreForEachStartingCoordinates()
-        # print("Pearson scores:")
-        # print(scores)
+
+        print(f'Min score: {min(scores)}, min index: {np.argmin(scores)}')
+        print(f'Max score: {max(scores)}, max index: {np.argmax(scores)}')
+
         break
 
     printEnd()
